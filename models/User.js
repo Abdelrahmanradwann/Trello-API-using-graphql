@@ -19,7 +19,9 @@ const UserSchema = new mongoose.Schema({
     },
     Profile_Pic: String,
     ResetPassword: String,
-    ResetPwExpiryDate: Date
+    ResetPwExpiryDate: Date,
+    VerificationCode: String,
+    ExpiryVCode: Date
 })
 
 module.exports = mongoose.model("User",UserSchema)

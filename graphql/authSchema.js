@@ -12,16 +12,19 @@ module.exports= buildSchema(`
         Email: String!
         Password: String
         Profile_Pic: String,
-        ResetPassword: String,
-        ResetPwExpiryDate: String
+        VerificationCode: String,
+        ExpiryVCode: String
     }
 
     type RootQuery {
         hello:String
     }
     type RootMutation {
-        signUp(userInput: userInputData): String!
-        logIn(userInput: userInputData): User!
+        signUp(userInput: userInputData!): String!
+        logIn(userInput: userInputData!): User!
+        forgetPassword(email: String!): String!
+        checkCode(email:String!,code:String!): Boolean!
+        resetPassword(email: String!,password: String!, confirmPassword: String!): User!
     }
     schema {
         query: RootQuery
