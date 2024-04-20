@@ -14,6 +14,7 @@ module.exports= buildSchema(`
         Profile_Pic: String,
         VerificationCode: String,
         ExpiryVCode: String
+        token: String
     }
 
     type RootQuery {

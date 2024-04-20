@@ -35,7 +35,7 @@ module.exports = {
                 Email: email
             })
             try {
-                const token = await generate.token({ id: newUser._id, email: newUser.Email });
+                var token = await generate.token({ id: newUser._id, email: newUser.Email });
             } catch (err) {
                 throw err
             }
@@ -51,6 +51,7 @@ module.exports = {
                 error.statusCode = 400;
                 throw error;
             }   
+            newUser.token = token 
             await newUser.save()
             return ("User is added successfully")
         } catch (err) {

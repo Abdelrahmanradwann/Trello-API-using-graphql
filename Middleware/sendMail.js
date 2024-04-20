@@ -18,9 +18,7 @@ async function sendResetEmail(email, msg, subject) {
 
     try {
         await transporter.sendMail(mailOptions);
-        console.log('Password reset email sent successfully.');
     } catch (error) {
-        console.error('Failed to send email:', error);
         throw error;
     }
 }

@@ -5,6 +5,7 @@ const { graphqlHTTP } = require('express-graphql');
 require('dotenv').config();
 const authSchema = require('./graphql/authSchema')
 const authResolver = require('./graphql/authResolver')
+const jwt = require('jsonwebtoken')
 
 const url = process.env.URL;
 
@@ -12,7 +13,7 @@ mongoose.connect(url).then(() => {
     console.log('Connected to DB');
 })
 
-app.use((req,res,next) => {
+app.use((req, res, next) => {
     const authtoken = req.headers["Authorization"] || req.headers["authorization"]
     if (authtoken) {
         const token = authtoken.split(' ')[1]

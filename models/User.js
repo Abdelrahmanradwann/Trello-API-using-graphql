@@ -17,6 +17,10 @@ const UserSchema = new mongoose.Schema({
         required: true,
         trim: true
     },
+    token: {
+        type: String,
+        required: true
+    },
     Profile_Pic: String,
     ResetPassword: String,
     ResetPwExpiryDate: Date,
