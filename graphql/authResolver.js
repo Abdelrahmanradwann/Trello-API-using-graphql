@@ -88,7 +88,9 @@ module.exports = {
                 error.code = 400;
                 throw error
             }
+           
             const token = await generate.token({ id: retrieveUser._id, email: retrieveUser.Email });
+            retrieveUser.token = token
             await retrieveUser.save();
             return {
                 ...retrieveUser._doc, _id: retrieveUser._id.toString()

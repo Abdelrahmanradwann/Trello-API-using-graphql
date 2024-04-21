@@ -15,10 +15,10 @@ const WorkSpaceSchema = new mongoose.Schema({
         required: true,
         trim: true
     },
-    Admin: {
+    Admin: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
-    },
+    }],
     Creator: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
@@ -35,4 +35,4 @@ const WorkSpaceSchema = new mongoose.Schema({
     
 )
 
-module.exports = mongoose.model('WorkSpaceSchema',WorkSpaceSchema)
+module.exports = mongoose.model('WorkSpace',WorkSpaceSchema)

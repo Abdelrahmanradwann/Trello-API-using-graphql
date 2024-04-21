@@ -5,6 +5,8 @@ const { graphqlHTTP } = require('express-graphql');
 require('dotenv').config();
 const authSchema = require('./graphql/authSchema')
 const authResolver = require('./graphql/authResolver')
+const profileSchema = require('./graphql/profileSchema')
+const profileResolver = require('./graphql/profileResolver')
 const jwt = require('jsonwebtoken')
 
 const url = process.env.URL;
@@ -13,31 +15,54 @@ mongoose.connect(url).then(() => {
     console.log('Connected to DB');
 })
 
-app.use((req, res, next) => {
-    const authtoken = req.headers["Authorization"] || req.headers["authorization"]
-    if (authtoken) {
-        const token = authtoken.split(' ')[1]
-        const SECRET_KEY = process.env.SECRET_KEY
-        const curuser = jwt.verify(token,SECRET_KEY)
-        req.current = curuser
-        req.auth = true
-    }
-    next()
-})
 
+app.use((req, res, next) => {
+    const authtoken = req.headers['authorization'] || req.headers['Authorization'];
+    if (authtoken) {
+        const token = authtoken.split(' ')[1];
+        const SECRET_KEY = process.env.SECRET_KEY;
+        try {
+            const curuser = jwt.verify(token, SECRET_KEY);
+            req.current = curuser;
+            req.auth = true;
+        } catch (error) {
+            if (error.name === 'TokenExpiredError') {
+                return res.status(401).json({ error: 'Token expired' });
+            } else if (error.name === 'JsonWebTokenError') {
+                return res.status(401).json({ error: 'Invalid token' });
+            } else {
+                return res.status(401).json({ error: 'Authentication failed' });
+            }
+        }
+    }
+    next();
+});
+
+
+
+function handleError(err) {
+        if (err.originalError) {
+        const error = {
+            code: err.originalError.code || 400,
+            msg: err.originalError.data || err.originalError.message
+        }
+        return error
+    }
+    return err
+}
 
 app.use('/graphql/auth', graphqlHTTP({
     schema: authSchema,
     rootValue: authResolver,
     customFormatErrorFn(err) {
-        if (err.originalError) {
-            const error = {
-                code: err.originalError.code || 400,
-                msg: err.originalError.data
-            }
-            return error
-        }
-        return err
+       return handleError(err)
+    }
+}))
+app.use('/graphql/profile', graphqlHTTP({
+    schema: profileSchema,
+    rootValue: profileResolver,
+    customFormatErrorFn(err) {
+        return handleError(err)
     }
 }))
 
