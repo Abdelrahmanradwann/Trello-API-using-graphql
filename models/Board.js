@@ -1,10 +1,10 @@
 const mongoose = require('mongoose');
 
 const BoardSchema = new mongoose.Schema({
-    Users: {
-        type: Map,  // name
-        of: String  // role
-    },
+    Users: [
+        { userId: String },
+        { role: String}
+    ],
     Lists: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'List',

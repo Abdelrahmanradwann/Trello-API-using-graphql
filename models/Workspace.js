@@ -8,7 +8,8 @@ const WorkSpaceSchema = new mongoose.Schema({
     Boards: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Board',
-        index: true
+        index: true,
+        // unique: true
     }],
     Title: {
         type: String,
