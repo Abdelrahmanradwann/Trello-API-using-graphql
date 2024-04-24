@@ -7,6 +7,8 @@ const authSchema = require('./graphql/authSchema')
 const authResolver = require('./graphql/authResolver')
 const profileSchema = require('./graphql/profileSchema')
 const profileResolver = require('./graphql/profileResolver')
+const adminSchema = require('./graphql/adminSchema')
+const adminResolver = require('./graphql/adminResolver')
 const jwt = require('jsonwebtoken')
 
 const url = process.env.URL;
@@ -65,6 +67,17 @@ app.use('/graphql/profile', graphqlHTTP({
         return handleError(err)
     }
 }))
+app.use('/graphql/admin', graphqlHTTP({
+    schema: adminSchema,
+    rootValue: adminResolver,
+    customFormatErrorFn(err) {
+        return handleError(err)
+    }
+}))
+
+
+
+
 
 
 app.listen(process.env.PORT, () => {
