@@ -13,10 +13,21 @@
         Users: [String!]!
         Creator: String
         isPublic: Boolean
+        Board: [String]
+    }
+
+    type Board {
+        _id: String!
+        lists: [String!]
+        tasks: [String!]
+        Creator: String!
+        Title: String!
     }
 
     type rootQuery {
-        hello: String
+        enterWorkSpace(id:String!): returnWorkSpace!
+        chooseBoard(id:String!): Board
+        searchBoard(boardName:String!,workSpaceId:String!): [Board!]
     }
 
     type rootMutation {

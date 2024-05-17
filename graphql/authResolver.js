@@ -2,7 +2,7 @@ const authValidation = require('../Middleware/authValidation')
 const bcrypt = require('bcrypt')
 const generate = require('../Middleware/authValidation')
 const User = require('../models/User')
-const { sendResetEmail } = require('../Middleware/sendMail')
+const { sendEmail } = require('../Middleware/sendMail')
 
 module.exports = {
     signUp: async function ({ userInput }, req ) {
@@ -39,7 +39,7 @@ module.exports = {
             } catch (err) {
                 throw err
             }
-            const check = await sendResetEmail(email, `
+            const check = await sendEmail(email, `
                 Dear ${username},
                 Your account has been created successfully!
                 Get started
@@ -113,7 +113,7 @@ module.exports = {
         user.ExpiryVCode = expiryDate
         await user.save()
         const subject = 'Email Verification'
-        await sendResetEmail(email, `Please enter this verification code ${code.toString()}`, subject)
+        await sendEmail(email, `Please enter this verification code ${code.toString()}`, subject)
         return 'Verification is sent'
     },
     checkCode: async function ({ email, code }, req) {

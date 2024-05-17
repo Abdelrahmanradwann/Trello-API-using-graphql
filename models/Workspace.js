@@ -9,7 +9,7 @@ const WorkSpaceSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Board',
         index: true,
-        // unique: true
+        unique: true
     }],
     Title: {
         type: String,
