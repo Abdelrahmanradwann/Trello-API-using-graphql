@@ -10,12 +10,17 @@ module.exports = buildSchema(`
         isPublic: Boolean
     }
 
+    type User {
+        Username: String!
+        Email: String!
+    }
+
     type returnWorkSpace {
-        _id: String!
+        _id: ID!
         Title: String!
-        Admin: String!
-        Users: [String!]!
-        Creator: String
+        Admin: [ID!]
+        Users: [User!]
+        Creator: User
         isPublic: Boolean
         Board: [String]
     }
@@ -28,14 +33,22 @@ module.exports = buildSchema(`
         Title: String!
     }
 
-    type rootQuery {
-        enterWorkSpace(id:String!): returnWorkSpace!
-        chooseBoard(id:String!): Board
-        searchBoard(boardName:String!,workSpaceId:String!): [Board!]
+    type workspaceResponse {
+        msg: String!
+        ws: [returnWorkSpace]
+        status: Boolean!
     }
 
+    type rootQuery {
+        enterWorkSpace(id:String!): workspaceResponse!
+        chooseBoard(id:String!): Board
+        searchBoard(boardName:String!,workSpaceId:String!): [Board!]
+        getWorkSpace: workspaceResponse
+    }
+
+
     type rootMutation {
-        createWorkSpace(inputData: inputWorkSpaceData!) : returnWorkSpace
+        createWorkSpace(inputData: inputWorkSpaceData!) : workspaceResponse
     }
 
     schema {

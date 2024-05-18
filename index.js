@@ -7,8 +7,8 @@ const authSchema = require('./graphql/authSchema')
 const authResolver = require('./graphql/authResolver')
 const profileSchema = require('./graphql/profileSchema')
 const profileResolver = require('./graphql/profileResolver')
-const adminSchema = require('./graphql/adminSchema')
-const adminResolver = require('./graphql/adminResolver')
+const groupSchema = require('./graphql/groupSchema')
+const groupResolver = require('./graphql/groupResolver')
 const jwt = require('jsonwebtoken')
 
 const url = process.env.URL;
@@ -68,8 +68,8 @@ app.use('/graphql/profile', graphqlHTTP({
     }
 }))
 app.use('/graphql/admin', graphqlHTTP({
-    schema: adminSchema,
-    rootValue: adminResolver,
+    schema: groupSchema,
+    rootValue: groupResolver,
     customFormatErrorFn(err) {
         return handleError(err)
     }
