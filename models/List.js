@@ -1,6 +1,10 @@
 const mongoose = require('mongoose');
 
 const ListSchema = new mongoose.Schema({
+    Title: {
+        type: String,
+        required: true
+    },
     Transition: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'List',
