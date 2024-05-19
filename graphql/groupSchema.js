@@ -99,6 +99,7 @@ module.exports = buildSchema(`
         createBoard(inputData: inputBoard!, workspaceId: String!): outputBoard!
         createWorkSpace(inputData: inputWorkSpaceData!) : workspaceResponse
         addList(inputList: inputList!): boardResponse!
+        removeList(workSpaceId: String, listId: String!): Boolean!
     }
 
     schema {

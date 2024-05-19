@@ -4,6 +4,7 @@ const { ObjectId } = require('mongodb');
 const{ errorHandle } = require('../util/errorHandling');
 const Board = require('../models/Board');
 const List = require('../models/List');
+const Task = require('../models/Task')
 
 module.exports = {
     addUser: async function ({ userId, workSpaceId, usingLink }, req) {
@@ -343,5 +344,34 @@ module.exports = {
             const error = errorHandle('Not authenticated', 400);
             throw error;
         }
+    },
+    removeList: async function ({ workSpaceId,listId }, req) {
+        if (req.auth) {
+            if (workSpaceId && listId) {
+                const workspace = await Workspace.findOne({ _id: workSpaceId, Admin: { $in: req.current.id } });
+                if (!workspace) {
+                    throw errorHandle('Workspace not found or you are not an admin');
+                }
+                const board = await Board.findOne({ Lists: { $in: listId } });
+                if (!board) {
+                    throw errorHandle('No list by this ID')
+                }
+                if (workspace.Boards.includes(board._id)) {
+                    const list = await List.findById(listId).select('Tasks');
+                    console.log(list)
+                    if (list) {
+                        await Task.deleteMany({ _id: { $in: list.Tasks } })
+
+                        await List.deleteOne({ _id: listId });
+
+                        return true;
+                    }
+                    throw errorHandle('List does not found', 404);
+                }   
+                throw new error('List not found in this workspace');
+            }
+            throw errorHandle('Missing fields', 400);
+        }
+        throw errorHandle('Not authenticated', 400);
     }
 }
