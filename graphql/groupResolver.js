@@ -348,30 +348,125 @@ module.exports = {
     removeList: async function ({ workSpaceId,listId }, req) {
         if (req.auth) {
             if (workSpaceId && listId) {
-                const workspace = await Workspace.findOne({ _id: workSpaceId, Admin: { $in: req.current.id } });
-                if (!workspace) {
-                    throw errorHandle('Workspace not found or you are not an admin');
-                }
-                const board = await Board.findOne({ Lists: { $in: listId } });
-                if (!board) {
-                    throw errorHandle('No list by this ID')
-                }
-                if (workspace.Boards.includes(board._id)) {
-                    const list = await List.findById(listId).select('Tasks');
-                    console.log(list)
-                    if (list) {
-                        await Task.deleteMany({ _id: { $in: list.Tasks } })
-
-                        await List.deleteOne({ _id: listId });
-
-                        return true;
+                try {
+                    const workspace = await Workspace.findOne({ _id: workSpaceId, Admin: { $in: req.current.id } });
+                    if (!workspace) {
+                        throw errorHandle('Workspace not found or you are not an admin');
                     }
-                    throw errorHandle('List does not found', 404);
-                }   
-                throw new error('List not found in this workspace');
-            }
+                    const board = await Board.findOne({ Lists: { $in: listId } });
+                    if (!board) {
+                        throw errorHandle('No list by this ID')
+                    }
+                    if (workspace.Boards.includes(board._id)) {
+                        const list = await List.findById(listId).select('Tasks');
+                        console.log(list)
+                        if (list) {
+                            await Task.deleteMany({ _id: { $in: list.Tasks } })
+
+                            await List.deleteOne({ _id: listId });
+
+                            await Board.updateOne(
+                                { _id: board._id },
+                                { $pull: { Lists: { _id: listId } } }
+                            );
+                            return true;
+                        }
+                        throw errorHandle('List does not found', 404);
+                    }
+                    throw new error('List not found in this workspace');
+                }
+                catch (err) {
+                throw err;
+               }
+            } 
             throw errorHandle('Missing fields', 400);
+            
         }
         throw errorHandle('Not authenticated', 400);
+    },
+    modifyList: async function ({ inputList,lstId }, req) {
+        if (req.auth) {
+            if (inputList.Title && inputList.workSpaceId && inputList.boardId && lstId ) {
+                try {
+                    let res = ['', {}, false];
+                    const workspace = await Workspace.findOne({ _id: inputList.workSpaceId }, { Admin: true, Boards: true });
+                    let indx = workspace.Admin.findIndex(i => i._id == req.current.id);
+                    if (indx != -1) {
+                        indx = workspace.Boards.findIndex(i => i._id == inputList.boardId);
+                        if (indx != -1) {
+                            const board = await Board.findOne({ _id: workspace.Boards[indx] }, { Lists: true });
+                            if (board.Lists.includes(lstId)) {
+                                let list = await List.findById(lstId);
+                                list.Title = inputList.Title || list.Title;
+                                list.Transition = inputList.Transition || list.Transition
+                                list.Tasks = inputList.Tasks || list.Tasks
+                                list.AllowedRoles = inputList.allowedRoles || list.AllowedRoles;
+                                await list.save();
+                                res.msg = 'List updated successfully';
+                                res.lst = list
+                                res.status = true
+                                return res
+                            }
+                            else {
+                                 throw errorHandle('List is not in this board')
+                            }
+                        }
+                        else {
+                            throw errorHandle('Error in input data, board is not in this workspace')
+                        }
+                    }
+                    else {
+                        throw errorHandle('Only admins are alowed to modify', 403);
+                    }
+
+                } catch (err) {
+                    throw err
+                }
+            }
+            else {
+                throw errorHandle('There are missing fields', 400);
+            }
+        }
+        throw errorHandle('Not authenticated', 400);
+    },
+    modifyBoard: async function ({ inputBoard }, req) {
+        if (!req.auth) {
+            throw errorHandle('Not authenticated', 400);
+        }
+        try {
+            const workspace = await Workspace.findOne({ Boards: { $in: inputBoard.id } });
+            if (workspace) {
+                let adminIndx = workspace.Admin.findIndex(i => i._id == req.current.id);
+                if (adminIndx != -1) {          
+                    const board = await Board.findById(inputBoard.id)
+                    let arr = [];
+                    inputBoard.Users.forEach(i => {
+                        if (!workspace.Users.includes(i.userId)) {
+                            throw errorHandle(`User Id ${i.userId} is not added yet in this workspace`);
+                        }
+                        arr.push({userId:i.userId,role:i.role });
+                    })
+                    board.Users = arr || board.Users;
+                    // board.Lists = inputBoard.Lists || board.Lists;
+                    board.Title = inputBoard.Title || board.Title;
+                    board.LinkExpiryDate = inputBoard.LinkExpiryDate || board.LinkExpiryDate;
+                    await board.save();
+                    let res = ['', {}, true];
+                    res.msg = 'Board modified successfully'
+                    res.board = board
+                    res.status = true;
+                    return res
+                }
+                else {
+                    throw errorHandle('Only admins can make modification', 403);
+                }
+            }
+            else {
+                throw errorHandle('Wrong input data', 404);
+            }
+        } catch (err) {
+            throw err;
+        }
+
     }
 }

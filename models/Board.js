@@ -2,8 +2,7 @@ const mongoose = require('mongoose');
 
 const BoardSchema = new mongoose.Schema({
     Users: [
-        { userId: String },
-        { role: String}
+        { userId: String ,role:String}
     ],
     Lists: [{
         type: mongoose.Schema.Types.ObjectId,

@@ -6,6 +6,22 @@ const { buildSchema } = require('graphql')
 // add, remove
 module.exports = buildSchema(`
 
+    type userBoard {
+        userId: ID!
+        role: String!
+    }
+    input userBoardInput {
+        userId: String!
+        role: String!
+    }
+    input board {
+        id:String!
+        Users: [userBoardInput!]
+        Lists: [String!]
+        Title: String!
+        LinkExpiryDate: String
+    }
+
     input inputBoard {
         Creator: String!
         Title: String!
@@ -58,10 +74,6 @@ module.exports = buildSchema(`
         Title: String!
     }
 
-    type userBoard {
-        userId: ID!
-        role: String!
-    }
 
     type returnBoard {
         _id: ID!
@@ -84,6 +96,19 @@ module.exports = buildSchema(`
         status: Boolean!
     }    
 
+    type list {
+        Title: String!
+        Transition: [ID!]
+        Creator: String!
+        Tasks: [ID!]
+        AllowedRoles: [String]!
+    }
+
+    type listResponse {
+        msg: String!
+        lst: list
+        status: Boolean!
+    }
 
 
     type rootQuery {
@@ -100,6 +125,8 @@ module.exports = buildSchema(`
         createWorkSpace(inputData: inputWorkSpaceData!) : workspaceResponse
         addList(inputList: inputList!): boardResponse!
         removeList(workSpaceId: String, listId: String!): Boolean!
+        modifyList(inputList: inputList!,lstId:String!): listResponse!
+        modifyBoard(inputBoard: board!): boardResponse!
     }
 
     schema {
