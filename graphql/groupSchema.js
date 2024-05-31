@@ -127,6 +127,7 @@ module.exports = buildSchema(`
         removeList(workSpaceId: String, listId: String!): Boolean!
         modifyList(inputList: inputList!,lstId:String!): listResponse!
         modifyBoard(inputBoard: board!): boardResponse!
+        deleteBoard(workSpaceId: String!, boardId: String!): Boolean!
     }
 
     schema {

@@ -5,6 +5,7 @@ const{ errorHandle } = require('../util/errorHandling');
 const Board = require('../models/Board');
 const List = require('../models/List');
 const Task = require('../models/Task')
+const Comment = require('../models/Comment')
 
 module.exports = {
     addUser: async function ({ userId, workSpaceId, usingLink }, req) {
@@ -362,6 +363,8 @@ module.exports = {
                         console.log(list)
                         if (list) {
                             await Task.deleteMany({ _id: { $in: list.Tasks } })
+                            
+                            await Comment.deleteMany({ Task: { $in: list.Tasks } });
 
                             await List.deleteOne({ _id: listId });
 
@@ -373,7 +376,7 @@ module.exports = {
                         }
                         throw errorHandle('List does not found', 404);
                     }
-                    throw new error('List not found in this workspace');
+                    throw errorHandle('List not found in this workspace',400);
                 }
                 catch (err) {
                 throw err;
@@ -468,5 +471,29 @@ module.exports = {
             throw err;
         }
 
+    },
+    deleteBoard: async function ({ workSpaceId, boardId }, req) {
+        if (req.auth) {
+            if (!(workSpaceId && boardId)) {
+                throw errorHandle('Missing input data', 400);
+            }     
+            const workspace = await Workspace.findOne({ _id: workSpaceId, Boards: { $in: boardId } }, { Users: 1 });
+            if (!workspace) {
+                throw errorHandle('Wrong input data', 404);
+            }
+            const isAdmin = workspace.Admin.findIndex(i =>  i._id == req.current.id )
+            
+            if (isAdmin == -1) {
+                throw errorHandle('Only admins can delete boards', 403);
+            }
+            const board = await Board.findById(boardId, { Lists: 1 }).populate('Lists','Tasks');
+            console.log(board);
+            return true;
+            //delete lists and comments
+            
+
+        } else {
+            throw errorHandle('Not authenticated', 400);
+        }
     }
 }
