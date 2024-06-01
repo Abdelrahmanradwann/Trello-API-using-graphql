@@ -472,27 +472,38 @@ module.exports = {
         }
 
     },
+    // need to be tested after adding tasks
     deleteBoard: async function ({ workSpaceId, boardId }, req) {
         if (req.auth) {
             if (!(workSpaceId && boardId)) {
                 throw errorHandle('Missing input data', 400);
-            }     
-            const workspace = await Workspace.findOne({ _id: workSpaceId, Boards: { $in: boardId } }, { Users: 1 });
-            if (!workspace) {
-                throw errorHandle('Wrong input data', 404);
             }
-            const isAdmin = workspace.Admin.findIndex(i =>  i._id == req.current.id )
-            
-            if (isAdmin == -1) {
-                throw errorHandle('Only admins can delete boards', 403);
-            }
-            const board = await Board.findById(boardId, { Lists: 1 }).populate('Lists','Tasks');
-            console.log(board);
-            return true;
-            //delete lists and comments
-            
+            try {
+                const workspace = await Workspace.findOne({ _id: workSpaceId, Boards: { $in: boardId } }, { Admin: 1 });
+                if (!workspace) {
+                    throw errorHandle('Wrong input data', 404);
+                }
+                const isAdmin = workspace.Admin.findIndex(i => i._id == req.current.id)
+                
+                if (isAdmin == -1) {
+                    throw errorHandle('Only admins can delete boards', 403);
+                }
+                const board = await Board.findById(boardId, { Lists: 1 }).populate('Lists', 'Tasks AllowedRoles');
+                const tasksTobeDelete = board.Lists.Tasks;
+                await Comment.deleteMany({ Task: { $in: tasksTobeDelete } });
+                await Task.deleteMany({ _id: { $in: tasksTobeDelete } });
+                await List.deleteMany({ _id: { $in: board } });
+                await Workspace.updateOne({ _id: workSpaceId }, { $pull: { Boards: boardId } });
+                await Board.deleteOne({ _id: boardId });
+    
+                return true;
 
-        } else {
+            } catch (err) {
+                throw err;
+            }
+        }
+           
+        else {
             throw errorHandle('Not authenticated', 400);
         }
     }
