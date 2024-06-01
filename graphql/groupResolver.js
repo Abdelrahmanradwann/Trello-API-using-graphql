@@ -488,7 +488,7 @@ module.exports = {
                 if (isAdmin == -1) {
                     throw errorHandle('Only admins can delete boards', 403);
                 }
-                const board = await Board.findById(boardId, { Lists: 1 }).populate('Lists', 'Tasks AllowedRoles');
+                const board = await Board.findById(boardId, { Lists: 1 }).populate('Lists', 'Tasks');
                 const tasksTobeDelete = board.Lists.Tasks;
                 await Comment.deleteMany({ Task: { $in: tasksTobeDelete } });
                 await Task.deleteMany({ _id: { $in: tasksTobeDelete } });
