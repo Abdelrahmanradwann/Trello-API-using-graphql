@@ -6,10 +6,8 @@ const { buildSchema } = require('graphql')
 // add, remove
 module.exports = buildSchema(`
 
-    type userBoard {
-        userId: ID!
-        role: String!
-    }
+
+
     input userBoardInput {
         userId: String!
         role: String!
@@ -21,16 +19,38 @@ module.exports = buildSchema(`
         Title: String!
         LinkExpiryDate: String
     }
-
     input inputBoard {
         Creator: String!
         Title: String!
     }
-
     type outputBoard {
         _id: String
         Title: String!
         Creator: String!
+    }
+     type userBoard {
+        userId: ID!
+        role: String!
+    }
+    type returnBoard {
+        _id: ID!
+        Users: [userBoard!]
+        Lists: [ID!]!
+        Creator: ID!
+        Title: String!
+        expiryDate: String
+    }
+    type boardResponse {
+        msg: String!
+        board: returnBoard
+        status: Boolean!
+    }    
+     type Board {
+        _id: String!
+        lists: [String!]
+        tasks: [String!]
+        Creator: String!
+        Title: String!
     }
 
 
@@ -41,21 +61,10 @@ module.exports = buildSchema(`
         Admin: String!
         isPublic: Boolean
     }
-
-    input inputList {
-        Title: String!
-        transition: [ID!]
-        tasks: [ID!]
-        workSpaceId: String!
-        boardId: String!
-        allowedRoles:[String]
-    }
-
     type User {
         Username: String!
         Email: String!
     }
-
     type returnWorkSpace {
         _id: ID!
         Title: String!
@@ -65,37 +74,24 @@ module.exports = buildSchema(`
         isPublic: Boolean
         Board: [String]
     }
-
-    type Board {
-        _id: String!
-        lists: [String!]
-        tasks: [String!]
-        Creator: String!
-        Title: String!
-    }
-
-
-    type returnBoard {
-        _id: ID!
-        Users: [userBoard!]
-        Lists: [ID!]!
-        Creator: ID!
-        Title: String!
-        expiryDate: String
-    }
-
     type workspaceResponse {
         msg: String!
         ws: [returnWorkSpace]
         status: Boolean!
     }
 
-    type boardResponse {
-        msg: String!
-        board: returnBoard
-        status: Boolean!
-    }    
 
+
+
+
+    input inputList {
+        Title: String!
+        transition: [ID!]
+        tasks: [ID!]
+        workSpaceId: String!
+        boardId: String!
+        allowedRoles:[String]
+    }
     type list {
         Title: String!
         Transition: [ID!]
@@ -103,10 +99,30 @@ module.exports = buildSchema(`
         Tasks: [ID!]
         AllowedRoles: [String]!
     }
-
     type listResponse {
         msg: String!
         lst: list
+        status: Boolean!
+    }
+
+
+    input task {
+        Title: String!
+        Deadline: String
+        Cur_list: ID!   
+        AssignedUsers: [ID!]
+        Description: String
+    }
+    type returnTask {
+        Title: String!
+        Deadline: String
+        Cur_list: ID!   
+        AssignedUsers: [ID!]
+        Description: String
+    }
+    type taskResponse {
+        msg: String!
+        task: returnTask
         status: Boolean!
     }
 
@@ -128,6 +144,7 @@ module.exports = buildSchema(`
         modifyList(inputList: inputList!,lstId:String!): listResponse!
         modifyBoard(inputBoard: board!): boardResponse!
         deleteBoard(workSpaceId: String!, boardId: String!): Boolean!
+        addTask(workSpaceId: String!, boardId: String!, listId: String!, taskData: task): taskResponse!
     }
 
     schema {

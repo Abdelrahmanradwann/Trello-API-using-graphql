@@ -314,7 +314,7 @@ module.exports = {
                                 Transition: inputList.transition,
                                 Creator: req.current.id,
                                 Tasks: [],
-                                AllowedRoles: []
+                                AllowedRoles: inputList.allowedRoles
                             })
                             await list.save();
                             board = await Board.findByIdAndUpdate(
@@ -401,8 +401,8 @@ module.exports = {
                             if (board.Lists.includes(lstId)) {
                                 let list = await List.findById(lstId);
                                 list.Title = inputList.Title || list.Title;
-                                list.Transition = inputList.Transition || list.Transition
-                                list.Tasks = inputList.Tasks || list.Tasks
+                                list.Transition = inputList.transition || list.Transition
+                                list.Tasks = inputList.tasks || list.Tasks
                                 list.AllowedRoles = inputList.allowedRoles || list.AllowedRoles;
                                 await list.save();
                                 res.msg = 'List updated successfully';
@@ -505,6 +505,82 @@ module.exports = {
            
         else {
             throw errorHandle('Not authenticated', 400);
+        }
+    },
+    addTask: async function ({ workSpaceId, boardId, listId, taskData }, req) {
+        if (!req.auth) {
+            throw errorHandle('Not authenticated', 400);
+        }
+        let input = Boolean(!workSpaceId || !boardId || !listId || !taskData.Title || !taskData.Cur_list);
+        if (input==true) {
+            throw errorHandle('Missing input data', 400);
+        }
+        try {
+            const workspace = await Workspace.findById(workSpaceId, { Admin: 1, Boards: 1, Users: 1 })
+            const isAdmin = workspace.Admin.findIndex(i => i._id == req.current.id);
+            if (isAdmin != -1) {
+                taskData.AssignedUsers.forEach(i => {
+                    if (workspace.Users.findIndex(j=>j._id==i) == -1) {
+                        throw errorHandle(`User ${i} not in this workspace`, 400)
+                    }
+                })
+                if (workspace.Boards.findIndex(i => i._id == boardId)==-1) {
+                    throw errorHandle('Board Id is not in this current workspace', 400);
+                }
+                else {
+                    let res = ['',{},true]
+                    const board = await Board.findById(boardId, { Lists: 1 }).populate({
+                        path: 'Lists',
+                        select: 'Tasks',
+                        populate: {
+                            path: 'Tasks',
+                            select: 'Title'
+                        }
+                    });
+                    console.log(board)
+                    board.Lists.forEach(i => {
+                            i.Tasks.forEach(j => {
+                               if (j.Title == taskData.Title) {
+                                    throw errorHandle('Please select another Title for the task', 400)
+                               }
+                            })
+                    })
+                    let deadlineDate = "";
+                    if (taskData.Deadline) {
+                        if (new Date() >= new Date(taskData.Deadline)) {
+                            throw errorHandle('Deadline date should be greater than current date');
+                        }
+                        deadlineDate = new Date(taskData.Deadline);
+                    }
+                    if (board.Lists.findIndex(i => i._id == listId)!=-1) {
+                        const newTask = new Task({
+                            Title: taskData.Title,
+                            Deadline: deadlineDate,
+                            Cur_list: taskData.Cur_list,
+                            AssignedUsers: taskData.AssignedUsers,
+                            Description: taskData.Description
+                        })
+                        console.log("here")
+                        await newTask.save();
+                                            
+
+                        await List.updateOne({ _id: listId }, { $push: { Tasks: newTask._id } });
+                        res.task = newTask;
+                        res.task.Deadline = toString(taskData.Deadline)
+                        res.msg = 'Task added successfully'
+                        res.status = true
+                        return res
+                    }
+                    else {
+                        throw errorHandle('List Id is not in this current board', 400)
+                    }
+                }
+
+            } else {
+                throw errorHandle('Not authorized, only admins can add tasks', 403)
+            }
+        } catch (err) {
+            throw err;
         }
     }
 }

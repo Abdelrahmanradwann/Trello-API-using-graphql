@@ -8,7 +8,6 @@ const TaskSchema = new mongoose.Schema({
     },
     Deadline: {
         type: Date,
-        required: true,
     },
     Cur_list: {
         type: mongoose.Schema.Types.ObjectId,
