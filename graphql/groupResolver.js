@@ -519,11 +519,13 @@ module.exports = {
             const workspace = await Workspace.findById(workSpaceId, { Admin: 1, Boards: 1, Users: 1 })
             const isAdmin = workspace.Admin.findIndex(i => i._id == req.current.id);
             if (isAdmin != -1) {
-                taskData.AssignedUsers.forEach(i => {
-                    if (workspace.Users.findIndex(j=>j._id==i) == -1) {
-                        throw errorHandle(`User ${i} not in this workspace`, 400)
-                    }
-                })
+                if (taskData.AssignedUsers) {
+                    taskData.AssignedUsers.forEach(i => {
+                        if (workspace.Users.findIndex(j => j._id == i) == -1) {
+                            throw errorHandle(`User ${i} not in this workspace`, 400)
+                        }
+                    })
+                }
                 if (workspace.Boards.findIndex(i => i._id == boardId)==-1) {
                     throw errorHandle('Board Id is not in this current workspace', 400);
                 }
@@ -536,8 +538,7 @@ module.exports = {
                             path: 'Tasks',
                             select: 'Title'
                         }
-                    });
-                    console.log(board)
+                    })
                     board.Lists.forEach(i => {
                             i.Tasks.forEach(j => {
                                if (j.Title == taskData.Title) {
@@ -560,10 +561,9 @@ module.exports = {
                             AssignedUsers: taskData.AssignedUsers,
                             Description: taskData.Description
                         })
-                        console.log("here")
+
                         await newTask.save();
                                             
-
                         await List.updateOne({ _id: listId }, { $push: { Tasks: newTask._id } });
                         res.task = newTask;
                         res.task.Deadline = toString(taskData.Deadline)
@@ -582,5 +582,86 @@ module.exports = {
         } catch (err) {
             throw err;
         }
+    },
+    modifyTask: async function ({ workSpaceId, boardId, moveTask, Title, Deadline, AllowedUsers, toListId, taskId}, req ) {
+        if (!req.auth) {
+            throw errorHandle('Not authenticated', 400);
+        }
+        if (!workSpaceId || !boardId || !taskId ||(moveTask!=false && moveTask!=true)) {
+            throw errorHandle('Missing fields', 400);
+        }
+        if (moveTask) {
+            if (!toListId) {
+                throw errorHandle('Missing fields', 400);
+            }
+            try {
+                const workspace = await Workspace.findById(workSpaceId, { Boards: 1, Admin: 1 });
+                if (workspace.Boards.findIndex(i => i._id == boardId) == -1) {
+                    throw errorHandle('Incorrect input data', 400);
+                }
+                const board = await Board.findById(boardId);
+                const task = await Task.findById(taskId);
+                if (board.Lists.findIndex(i => i._id != task.Cur_list) == -1 || board.Lists.findIndex(i => i._id == toListId) == -1) {
+                    throw errorHandle('These lists Ids are not in this board', 404);
+                }
+                if (task.Cur_list == toListId) throw errorHandle('Current list Id is similar to destination list id');
+                const list = await List.findById(task.Cur_list, { Transition: 1 });
+                const isValidTransition = false;
+                list.Transition.forEach(i => {
+                    if (i == toListId) {
+                        isValidTransition = true;
+                    }
+                })
+                if (!isValidTransition) {
+                    throw errorHandle('Cannot move this task to the wanted list', 400);
+                }
+                if (task.AssignedUsers.findIndex(i => i._id == req.current.id) == -1 && workspace.Admin.findIndex(i=>i._id==req.current.id)==-1) {
+                    throw errorHandle('You are not assigned to this task, won\'t be able to move it', 403);
+                }
+                task.Cur_list = toListId;
+                await task.save;
+                let res = {
+                    msg: "Updated successfully",
+                    task: task,
+                    status: true
+                };
+                return res;
+            } catch (err) {
+                throw err;
+            }
+        }
+        else {
+            try {
+                const workspace = await Workspace.findById(workSpaceId, { Admin: 1, Boards: 1 });
+                if (workspace.Admin.findIndex(i => i._id == req.current.id) == -1) {
+                    throw errorHandle('Not authorized', 403);
+                }
+                if (workspace.Boards.findIndex(i => i._id == boardId) == -1) {
+                    throw errorHandle('Incorrect board id', 404);
+                }
+                const board = await Board.findById(boardId, { Lists: 1 });
+                const task = await Task.findById(taskId);
+                if (board.Lists.indexOf(task.Cur_list)== -1) {
+                    console.log(task.Cur_list);
+                    console.log(board.Lists)
+                    throw errorHandle('This board doesnt contain this tasK id', 404);
+                }
+                if (Title) task.Title = Title
+                if (Deadline) {
+                    task.Deadline = new Date(Deadline)
+                }
+                if (AllowedUsers) task.AssignedUsers = AllowedUsers
+                await task.save();
+                let res = {
+                    msg: 'Task updated succesffully',
+                    task: task,
+                    status: true
+                }
+                return res;
+            } catch (err) {
+                throw err;
+            }
+        }
+       
     }
 }
