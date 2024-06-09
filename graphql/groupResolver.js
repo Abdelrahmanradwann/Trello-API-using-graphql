@@ -1,14 +1,17 @@
-const Workspace = require('../models/Workspace')
+const Workspace = require('../models/Workspace');
 const board = require('../models/Board');
 const { ObjectId } = require('mongodb');
 const{ errorHandle } = require('../util/errorHandling');
 const Board = require('../models/Board');
 const List = require('../models/List');
-const Task = require('../models/Task')
-const Comment = require('../models/Comment')
+const Task = require('../models/Task');
+const Comment = require('../models/Comment');
+const User = require('../models/User')
+const { sendEmail } = require('../Middleware/sendMail');
+const { v4: uuid4 } = require('uuid');
 
 module.exports = {
-    addUser: async function ({ userId, workSpaceId, usingLink }, req) {
+    addUser: async function ({ userId, workSpaceId }, req) {
         const workspace = await Workspace.findOne({ _id: workSpaceId });
         if (!workSpaceId) {
             const error = new Error();
@@ -16,29 +19,6 @@ module.exports = {
             error.code = 404;
             throw error;
          }
-        if (!usingLink) {
-            if (!req.auth) {
-                const error = new Error();
-                error.data = 'Not authenticated';
-                error.code = 401;
-                throw error;
-            }
-            if (!workspace.Admin.includes(req.current.id)) {
-                const error = new Error();
-                error.data = 'Not authorized';
-                error.code = 401;
-                throw error;
-            }
-        } else {
-            const date = new Date();
-            if (!workspace.LinkExpiryDate || workspace.LinkExpiryDate > date.getTime() || !workspace.isPublic) {
-                const error = new Error();
-                error.data = 'Link has expired, Try contact the admin';
-                error.code = 400;
-                throw error;
-            }         
-        }
-        console.log(userId)
             const user = workspace.Users.includes(userId);
             if (user) {
                 const error = new Error()
@@ -82,6 +62,56 @@ module.exports = {
             return 'User removed successfully from workspace'
         } catch (err) {
             throw err;
+        }
+    },
+    inviteUser: async function ({ workSpaceId, email }, req) {
+        if (!req.auth) {
+            throw errorHandle('Not authenticated', 400);
+        }
+        if (!workSpaceId || !email) throw errorHandle('Incorrect input data', 400);
+
+        try {
+            const workspace = await Workspace.findById(workSpaceId, { Admin: 1, Users: 1 }).populate('Users', 'Email');
+            if (workspace.Admin.indexOf(req.current.id) != -1) {
+                console.log(workspace)
+                if (workspace.Users.findIndex(i => i.Email == email) != -1) {
+                    throw errorHandle('User already exists in this workspace', 400);
+                }
+                const user = await User.findOne({ Email: email }, { Username: 1 });
+                const date = new Date();
+                const link = `https://workspaceInvitation/verify/${uuid4()}/${workSpaceId}/${date}`;
+                sendEmail(email,
+                    `Dear ${user.Username},
+                 We would like to invite you to our workspace.
+                 If you are interested, please click on the link below. 
+                ${link}
+                `
+                    , 'Workspace invitation')
+                return true;
+
+            } else {
+                throw errorHandle('Not authorized', 403);
+            }
+        } catch (err) { throw err; }
+    },
+    acceptInvitation: async function ({ workSpaceId , date }, req) {
+        if (!req.auth) throw errorHandle('Not authenticated', 400);
+        if (!workSpaceId) throw errorHandle('Incorrect input data', 400);
+        let diff = new Date().getTime() - new Date(date).getTime();
+        const days = diff / (1000 * 60 * 60 * 24); // number of days
+        if (days < 7) {
+            const workspace = await Workspace.findOne({ _id: workSpaceId, Users: { $in: req.current.id } });
+            if (workspace) {
+                throw errorHandle('You already in this workspace', 400);
+            }
+            try {
+                await Workspace.updateOne({ _id: workSpaceId }, { $push: { Users: req.current.id } });
+                return true;
+            } catch (err) {
+                throw err;
+            }
+        } else {
+            throw errorHandle('Invitation link has expired', 404);
         }
     },
     createBoard: async function ({ inputData , workspaceId }, req) {
@@ -600,13 +630,13 @@ module.exports = {
                     throw errorHandle('Incorrect input data', 400);
                 }
                 const board = await Board.findById(boardId);
-                const task = await Task.findById(taskId);
+                let task = await Task.findById(taskId);
                 if (board.Lists.findIndex(i => i._id != task.Cur_list) == -1 || board.Lists.findIndex(i => i._id == toListId) == -1) {
                     throw errorHandle('These lists Ids are not in this board', 404);
                 }
                 if (task.Cur_list == toListId) throw errorHandle('Current list Id is similar to destination list id');
                 const list = await List.findById(task.Cur_list, { Transition: 1 });
-                const isValidTransition = false;
+                let isValidTransition = false;
                 list.Transition.forEach(i => {
                     if (i == toListId) {
                         isValidTransition = true;
@@ -619,7 +649,7 @@ module.exports = {
                     throw errorHandle('You are not assigned to this task, won\'t be able to move it', 403);
                 }
                 task.Cur_list = toListId;
-                await task.save;
+                await task.save();
                 let res = {
                     msg: "Updated successfully",
                     task: task,

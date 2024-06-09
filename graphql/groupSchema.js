@@ -135,8 +135,10 @@ module.exports = buildSchema(`
     }
 
     type rootMutation {
-        addUser(userId: String!, workSpaceId: String!, usingLink: Boolean!):String!
+        addUser(userId: String!, workSpaceId: String!):String!
         removeUser(userId: String!, workSpaceId: String!): String!
+        inviteUser(workSpaceId: String!, email:String!): Boolean!
+        acceptInvitation(workSpaceId:String!, date:String!): Boolean!
         createBoard(inputData: inputBoard!, workspaceId: String!): outputBoard!
         createWorkSpace(inputData: inputWorkSpaceData!) : workspaceResponse
         addList(inputList: inputList!): boardResponse!
