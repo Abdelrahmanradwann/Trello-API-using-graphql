@@ -423,6 +423,9 @@ module.exports = {
                 try {
                     let res = ['', {}, false];
                     const workspace = await Workspace.findOne({ _id: inputList.workSpaceId }, { Admin: true, Boards: true });
+                    if (!workspace) {
+                        throw errorHandle('Workspace not found', 404);
+                    }
                     let indx = workspace.Admin.findIndex(i => i._id == req.current.id);
                     if (indx != -1) {
                         indx = workspace.Boards.findIndex(i => i._id == inputList.boardId);
@@ -547,6 +550,9 @@ module.exports = {
         }
         try {
             const workspace = await Workspace.findById(workSpaceId, { Admin: 1, Boards: 1, Users: 1 })
+            if (!workspace) {
+                throw errorHandle('Workspace not found', 404);
+            }
             const isAdmin = workspace.Admin.findIndex(i => i._id == req.current.id);
             if (isAdmin != -1) {
                 if (taskData.AssignedUsers) {
@@ -569,6 +575,9 @@ module.exports = {
                             select: 'Title'
                         }
                     })
+                    if (!board) {
+                        throw errorHandle('Board not found', 404);
+                    }
                     board.Lists.forEach(i => {
                             i.Tasks.forEach(j => {
                                if (j.Title == taskData.Title) {
@@ -626,11 +635,17 @@ module.exports = {
             }
             try {
                 const workspace = await Workspace.findById(workSpaceId, { Boards: 1, Admin: 1 });
+                if (!workspace) {
+                    throw errorHandle('Workspace not found', 404);
+                }
                 if (workspace.Boards.findIndex(i => i._id == boardId) == -1) {
                     throw errorHandle('Incorrect input data', 400);
                 }
                 const board = await Board.findById(boardId);
                 let task = await Task.findById(taskId);
+                if (!board || !task) {
+                    throw errorHandle('Board or task not found', 404);
+                }
                 if (board.Lists.findIndex(i => i._id != task.Cur_list) == -1 || board.Lists.findIndex(i => i._id == toListId) == -1) {
                     throw errorHandle('These lists Ids are not in this board', 404);
                 }
