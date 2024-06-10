@@ -693,5 +693,46 @@ module.exports = {
             }
         }
        
+    },
+    addComment: async function ({ taskId, content }, req) {
+        if (req.auth) {
+            if (taskId && content) {
+                try {
+                    const task = await Task.findById(taskId);
+                    if (!task) {
+                        throw errorHandle('Task not found', 404);
+                    }
+                    const board = await Board.findOne({ Lists: { $in: task.Cur_list } });
+                    if (!board) {
+                        throw errorHandle('Board not found', 404);
+                    }
+                    const workspace = await Workspace.findOne({ Boards: { $in: board._id } }, { Admin: 1 });
+                    if (!workspace) {
+                        throw errorHandle('Workspace not found', 404);
+                    }
+                    if (task.AssignedUsers.findIndex(i => i._id == req.current.id) != -1 || workspace.Admin.findIndex(i=>i._id.toString == req.current.id.toString)) {
+                        const comment = new Comment({
+                            Task: taskId,
+                            Sender: req.current.id,
+                            Content: content
+                        })
+                        await comment.save();
+                        let res = { msg: 'Comment added successfully', task: task, status: 1 };
+                        return res;
+                    }
+                    else {
+                        throw errorHandle('Not authorized', 403);
+                    }
+                } catch (err) {
+                    throw err;
+                }
+            }
+            else {
+                throw errorHandle('Incorrent input data', 400);
+            }
+            
+        } else {
+            throw errorHandle('Not authenticated', 400);
+        }
     }
 }

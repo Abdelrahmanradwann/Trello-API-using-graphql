@@ -148,6 +148,7 @@ module.exports = buildSchema(`
         deleteBoard(workSpaceId: String!, boardId: String!): Boolean!
         addTask(workSpaceId: String!, boardId: String!, listId: String!, taskData: task): taskResponse!
         modifyTask(workSpaceId: String!, boardId: String!, moveTask: Boolean!, Title:String, Deadline:String, AllowedUsers:[ID!], toListId: String, taskId: String!): taskResponse!
+        addComment(taskId:String!, content:String!): taskResponse!
     }
 
     schema {

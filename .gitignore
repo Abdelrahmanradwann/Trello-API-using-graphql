@@ -1,2 +1,4 @@
 /node_modules
 .env
+/graphql/authSchema.graphql
+/graphql/groupSchema.graphql
