@@ -5,8 +5,6 @@ const { graphqlHTTP } = require('express-graphql');
 require('dotenv').config();
 const authSchema = require('./graphql/authSchema')
 const authResolver = require('./graphql/authResolver')
-// const profileSchema = require('./graphql/profileSchema')
-// const profileResolver = require('./graphql/profileResolver')
 const groupSchema = require('./graphql/groupSchema')
 const groupResolver = require('./graphql/groupResolver')
 const jwt = require('jsonwebtoken')
@@ -60,13 +58,7 @@ app.use('/graphql/auth', graphqlHTTP({
        return handleError(err)
     }
 }))
-// app.use('/graphql/profile', graphqlHTTP({
-//     schema: profileSchema,
-//     rootValue: profileResolver,
-//     customFormatErrorFn(err) {
-//         return handleError(err)
-//     }
-// }))
+
 app.use('/graphql/admin', graphqlHTTP({
     schema: groupSchema,
     rootValue: groupResolver,

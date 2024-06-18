@@ -2,79 +2,63 @@
         userId: String!
         role: String!
     }
-    input board {
-        id:String!
+    input boardData {
+        id:String
         Users: [userBoardInput!]
         Lists: [String!]
-        Title: String!
+        Title: String
         LinkExpiryDate: String
+        Creator: String
     }
-    input inputBoard {
-        Creator: String!
-        Title: String!
-    }
-    type outputBoard {
-        _id: String
-        Title: String!
-        Creator: String!
-    }
-     type userBoard {
+    type UserBoard {
         userId: ID!
         role: String!
-    }
-    type returnBoard {
+    }  
+    type Board {
         _id: ID!
-        Users: [userBoard!]
-        Lists: [ID!]!
+        Users: [UserBoard!]
+        Lists: [ID!]
         Creator: ID!
         Title: String!
         expiryDate: String
     }
-    type boardResponse {
+    type BoardResponse {
         msg: String!
-        board: returnBoard
+        board: Board
         status: Boolean!
     }    
-     type Board {
-        _id: String!
-        lists: [String!]
-        tasks: [String!]
-        Creator: String!
-        Title: String!
-    }
+   
 
 
-    input inputWorkSpaceData {
+    input workSpaceData {
         User: [String]
         Board: [String]
         Title: String!
         Admin: String!
         isPublic: Boolean
     }
-    type User {
+    type UserWorkSpace {
         Username: String!
         Email: String!
     }
-    type returnWorkSpace {
+    type WorkSpace {
         _id: ID!
         Title: String!
         Admin: [ID!]
-        Users: [User!]
-        Creator: User
+        Users: [UserWorkSpace!]
+        Creator: UserWorkSpace
         isPublic: Boolean
-        Board: [String]
+        Boards: [String]
     }
-    type workspaceResponse {
+    type WorkspaceResponse {
         msg: String!
-        ws: [returnWorkSpace]
+        ws: [WorkSpace]
         status: Boolean!
     }
 
 
 
-
-
-    input inputList {
+    input listData {
         Title: String!
         transition: [ID!]
         tasks: [ID!]
@@ -96,32 +80,35 @@
     }
 
 
-    input task {
+    input taskData {
         Title: String!
         Deadline: String
         Cur_list: ID!   
         AssignedUsers: [ID!]
         Description: String
     }
-    type returnTask {
+    type Task {
         Title: String!
         Deadline: String
         Cur_list: ID!   
         AssignedUsers: [ID!]
         Description: String
     }
-    type taskResponse {
+    type TaskResponse {
         msg: String!
-        task: returnTask
+        task: Task
         status: Boolean!
     }
 
 
+
+
     type rootQuery {
-        enterWorkSpace(id:String!): workspaceResponse!
+        enterWorkSpace(id:String!): WorkspaceResponse!
         chooseBoard(id:String!): Board
         searchBoard(boardName:String!,workSpaceId:String!): [Board!]
-        getWorkSpace: workspaceResponse
+        getWorkSpace: WorkspaceResponse
+        getTasks(boardId:String,taskId:String):[TaskResponse!]
     }
 
     type rootMutation {
@@ -129,17 +116,18 @@
         removeUser(userId: String!, workSpaceId: String!): String!
         inviteUser(workSpaceId: String!, email:String!): Boolean!
         acceptInvitation(workSpaceId:String!, date:String!): Boolean!
-        createBoard(inputData: inputBoard!, workspaceId: String!): outputBoard!
-        createWorkSpace(inputData: inputWorkSpaceData!) : workspaceResponse
-        addList(inputList: inputList!): boardResponse!
+        createBoard(inputData: boardData!, workspaceId: String!): BoardResponse!
+        createWorkSpace(inputData: workSpaceData!) : WorkspaceResponse!
+        addList(inputList: listData!): BoardResponse!
         removeList(workSpaceId: String, listId: String!): Boolean!
-        modifyList(inputList: inputList!,lstId:String!): listResponse!
-        modifyBoard(inputBoard: board!): boardResponse!
+        modifyList(inputList: listData!,lstId:String!): listResponse!
+        modifyBoard(inputBoard: boardData!): BoardResponse!
         deleteBoard(workSpaceId: String!, boardId: String!): Boolean!
-        addTask(workSpaceId: String!, boardId: String!, listId: String!, taskData: task): taskResponse!
-        modifyTask(workSpaceId: String!, boardId: String!, moveTask: Boolean!, Title:String, Deadline:String, AllowedUsers:[ID!], toListId: String, taskId: String!): taskResponse!
-        
-        addComment(taskId:String!, content:String!): taskResponse!
+        addTask(workSpaceId: String!, boardId: String!, listId: String!, taskData: taskData): TaskResponse!
+        modifyTask(workSpaceId: String!, boardId: String!, moveTask: Boolean!, Title:String, 
+        Deadline:String, AllowedUsers:[ID!], toListId: String, taskId: String!): TaskResponse!
+        deleteTask(boardId:String!, taskId:String):Boolean!
+        addComment(taskId:String!, content:String!): TaskResponse!
     }
 
     schema {

@@ -9,16 +9,21 @@ const Comment = require('../models/Comment');
 const User = require('../models/User')
 const { sendEmail } = require('../Middleware/sendMail');
 const { v4: uuid4 } = require('uuid');
+const { restart } = require('nodemon');
 
 module.exports = {
     addUser: async function ({ userId, workSpaceId }, req) {
-        const workspace = await Workspace.findOne({ _id: workSpaceId });
-        if (!workSpaceId) {
-            const error = new Error();
-            error.data = 'Workspace does not found';
-            error.code = 404;
-            throw error;
-         }
+        if (!req.auth) {
+            throw errorHandle('Not authorized', 400);
+        }
+        try {
+            const workspace = await Workspace.findOne({ _id: workSpaceId });
+            if (!workSpaceId) {
+                const error = new Error();
+                error.data = 'Workspace not found';
+                error.code = 404;
+                throw error;
+            }
             const user = workspace.Users.includes(userId);
             if (user) {
                 const error = new Error()
@@ -26,14 +31,14 @@ module.exports = {
                 error.code = 400
                 throw error
             }
-            try {
                 const objId = ObjectId.createFromHexString(userId);
                 workspace.Users.push(objId)
                 await workspace.save();
                 return 'User added to workspace successfully';
-            } catch (err) {
-                throw err
-            }
+        
+        } catch (err) {
+            throw err;
+        }
     },
     removeUser: async function ({ userId, workSpaceId }, req) {
         if (!req.auth) {
@@ -55,7 +60,7 @@ module.exports = {
                 throw error;
             }
             if (!workspace.Admin.includes(req.current.id) || workspace.Creator==userId) {
-                const error = errorHandle('Not authorized', 401);
+                const error = errorHandle('Not authorized, only admins can remove members', 403);
                 throw error;
             }
             await Workspace.updateOne({ _id: workSpaceId }, { $pull: { Users: userId, Admin: userId } })
@@ -73,7 +78,6 @@ module.exports = {
         try {
             const workspace = await Workspace.findById(workSpaceId, { Admin: 1, Users: 1 }).populate('Users', 'Email');
             if (workspace.Admin.indexOf(req.current.id) != -1) {
-                console.log(workspace)
                 if (workspace.Users.findIndex(i => i.Email == email) != -1) {
                     throw errorHandle('User already exists in this workspace', 400);
                 }
@@ -117,10 +121,10 @@ module.exports = {
     createBoard: async function ({ inputData , workspaceId }, req) {
         const Title = inputData.Title;
         const Creator = inputData.Creator;
-        if (!req.auth) {
-            const error = errorHandle('Not authenticated', 400);
-            throw error;
-        }
+        // if (!req.auth) {
+        //     const error = errorHandle('Not authenticated', 400);
+        //     throw error;
+        // }
         try {
             const workspace = await Workspace.findOne({ _id: workspaceId, Admin: { $in: req.current.id } });
             if (!workspace) {
@@ -129,7 +133,7 @@ module.exports = {
             let boards = await Workspace.findOne({ _id: workspaceId }).populate({ path: 'Boards', select: 'Title' });
             for (var i of boards.Boards) {
                 if (i.Title == Title) {
-                    throw errorHandle('This board name already used in this workspace');
+                    throw errorHandle('This board name already used in this workspace, please select another name');
                 }
             }
             let board = new Board({
@@ -138,7 +142,8 @@ module.exports = {
             board = await board.save();
             workspace.Boards.push(board._id);
             await workspace.save();
-            return board
+            let res = {msg:'Board created successfully',board:board,status:true}
+            return res;
         } catch (err) {
             throw err;
         }
@@ -155,21 +160,12 @@ module.exports = {
         isPublic = inputData.isPublic?inputData.isPublic:false
         try {
             let res = { msg: "", ws: [], status: false };
-            let creator = await User.findById(req.current.id);
             let workspace = new Workspace({
                 user, Board, Title, Admin, isPublic,
                 Creator: req.current.id , Admin: [req.current.id],Users :[req.current.id]
             })
              await workspace.save()
-            res._id = workspace._id
-            res.Title = Title
-            res.Admin = [req.current.id]
-            res.Creator = {
-                Username: creator.Username,
-                Email: creator.Email
-            }
-            res.Users = [req.current.id]
-            res.isPublic = isPublic
+            res.ws = [workspace]
             res.msg = "WorkSspace created successfully"
             res.status = true         
             return res
@@ -197,10 +193,13 @@ module.exports = {
                 workspace.Users.forEach(i => {
                     stringIds.push(i._id.toString())
                 })
-                console.log(workspace)
-                if (stringIds.includes((req.current.id))) {
+                workspace.Admin.forEach(i => {
+                    console.log(i._id.toString())
+                })
+            
+                if (stringIds.includes((req.current.id))|| (workspace.Admin.findIndex(i=>i._id.toString()==req.current.id.toString())!=-1)) {
                     res.msg = "Success"
-                    res.ws = [workspace]
+                    res.ws.push(workspace)
                     res.status = true
                     return res
                 }
@@ -288,18 +287,17 @@ module.exports = {
         }
     },
     getWorkSpace: async function (args,req) {
-        if (req.auth) {
+        // if (req.auth) {
             let res = { msg: "", ws: [], status: false };
             try {
                 let availWorkSpace = await Workspace.find({ Users: { $in: req.current.id } }, { inviteLink: 0, LinkExpiryDate: 0 }).populate('Users', 'Username Email').populate('Creator', 'Username Email');
                 if (availWorkSpace) {
-                    res.msg = "There are workspaces"
+                    res.msg = "These are the workspaces"
                     res.ws = availWorkSpace
                     res.status = true
                     return res;
                 }
                 res.msg = "No Workspaces"
-                res.ws = {}
                 res.status = false
                 return res;
             
@@ -308,7 +306,7 @@ module.exports = {
             catch (err) {
             throw new Error(err)
         }
-        }
+        // }
         return new Error("Not auth");
     },
     addList: async function ({ inputList }, req) {
@@ -382,11 +380,11 @@ module.exports = {
                 try {
                     const workspace = await Workspace.findOne({ _id: workSpaceId, Admin: { $in: req.current.id } });
                     if (!workspace) {
-                        throw errorHandle('Workspace not found or you are not an admin');
+                        throw errorHandle('Workspace not found or you are not an admin', 404);
                     }
                     const board = await Board.findOne({ Lists: { $in: listId } });
                     if (!board) {
-                        throw errorHandle('No list by this ID')
+                        throw errorHandle('No list by this ID', 404);
                     }
                     if (workspace.Boards.includes(board._id)) {
                         const list = await List.findById(listId).select('Tasks');
@@ -406,7 +404,7 @@ module.exports = {
                         }
                         throw errorHandle('List does not found', 404);
                     }
-                    throw errorHandle('List not found in this workspace',400);
+                    throw errorHandle('Board not found in this workspace',404);
                 }
                 catch (err) {
                 throw err;
@@ -478,7 +476,7 @@ module.exports = {
                     let arr = [];
                     inputBoard.Users.forEach(i => {
                         if (!workspace.Users.includes(i.userId)) {
-                            throw errorHandle(`User Id ${i.userId} is not added yet in this workspace`);
+                            throw errorHandle(`User Id ${i.userId} is not added yet in this workspace`, 404);
                         }
                         arr.push({userId:i.userId,role:i.role });
                     })
@@ -487,10 +485,7 @@ module.exports = {
                     board.Title = inputBoard.Title || board.Title;
                     board.LinkExpiryDate = inputBoard.LinkExpiryDate || board.LinkExpiryDate;
                     await board.save();
-                    let res = ['', {}, true];
-                    res.msg = 'Board modified successfully'
-                    res.board = board
-                    res.status = true;
+                    let res = {msg:'Board modified successfully',board:board,status:true}
                     return res
                 }
                 else {
@@ -509,12 +504,12 @@ module.exports = {
     deleteBoard: async function ({ workSpaceId, boardId }, req) {
         if (req.auth) {
             if (!(workSpaceId && boardId)) {
-                throw errorHandle('Missing input data', 400);
+                throw errorHandle('Invalid input data', 400);
             }
             try {
                 const workspace = await Workspace.findOne({ _id: workSpaceId, Boards: { $in: boardId } }, { Admin: 1 });
                 if (!workspace) {
-                    throw errorHandle('Wrong input data', 404);
+                    throw errorHandle('Workspace not found', 404);
                 }
                 const isAdmin = workspace.Admin.findIndex(i => i._id == req.current.id)
                 
@@ -546,7 +541,7 @@ module.exports = {
         }
         let input = Boolean(!workSpaceId || !boardId || !listId || !taskData.Title || !taskData.Cur_list);
         if (input==true) {
-            throw errorHandle('Missing input data', 400);
+            throw errorHandle('Invalid input data', 400);
         }
         try {
             const workspace = await Workspace.findById(workSpaceId, { Admin: 1, Boards: 1, Users: 1 })
@@ -627,11 +622,11 @@ module.exports = {
             throw errorHandle('Not authenticated', 400);
         }
         if (!workSpaceId || !boardId || !taskId ||(moveTask!=false && moveTask!=true)) {
-            throw errorHandle('Missing fields', 400);
+            throw errorHandle('Invalid input data', 400);
         }
         if (moveTask) {
             if (!toListId) {
-                throw errorHandle('Missing fields', 400);
+                throw errorHandle('Invalid input data', 400);
             }
             try {
                 const workspace = await Workspace.findById(workSpaceId, { Boards: 1, Admin: 1 });
@@ -649,7 +644,7 @@ module.exports = {
                 if (board.Lists.findIndex(i => i._id != task.Cur_list) == -1 || board.Lists.findIndex(i => i._id == toListId) == -1) {
                     throw errorHandle('These lists Ids are not in this board', 404);
                 }
-                if (task.Cur_list == toListId) throw errorHandle('Current list Id is similar to destination list id');
+                if (task.Cur_list == toListId) throw errorHandle('Current list Id is similar to destination list id', 400);
                 const list = await List.findById(task.Cur_list, { Transition: 1 });
                 let isValidTransition = false;
                 list.Transition.forEach(i => {
@@ -658,10 +653,10 @@ module.exports = {
                     }
                 })
                 if (!isValidTransition) {
-                    throw errorHandle('Cannot move this task to the wanted list', 400);
+                    throw errorHandle('Invalid Transition', 400);
                 }
                 if (task.AssignedUsers.findIndex(i => i._id == req.current.id) == -1 && workspace.Admin.findIndex(i=>i._id==req.current.id)==-1) {
-                    throw errorHandle('You are not assigned to this task, won\'t be able to move it', 403);
+                    throw errorHandle('Not assigned to this task, you won\'t be able to move it', 403);
                 }
                 task.Cur_list = toListId;
                 await task.save();
@@ -687,8 +682,6 @@ module.exports = {
                 const board = await Board.findById(boardId, { Lists: 1 });
                 const task = await Task.findById(taskId);
                 if (board.Lists.indexOf(task.Cur_list)== -1) {
-                    console.log(task.Cur_list);
-                    console.log(board.Lists)
                     throw errorHandle('This board doesnt contain this tasK id', 404);
                 }
                 if (Title) task.Title = Title
@@ -709,6 +702,39 @@ module.exports = {
         }
        
     },
+    deleteTask: async function ({ boardId, taskId }, req) {
+        if (!req.auth) {
+            throw errorHandle('Not authenticated', 400);
+        }
+        if (!board || !taskId) {
+            throw errorHandle('Invalid input data', 400);
+        }
+        try {
+            const workspace = await Workspace.findOne({ Boards: { $in: boardId } }, { Admin: 1 });
+            if (!workspace) {
+                throw errorHandle('Workspace not found', 404);
+            }
+            if (workspace.Admin.findIndex(i => i.toString == req.current.id.toString) == -1) {
+                throw errorHandle('Only admins can delete this task', 403);
+            }
+            const board = await Board.findById(boardId);
+            const task = await Task.findById(taskId);
+            if (!board || task) {
+                throw errorHandle('Board or task not found', 404);
+            }
+            const curList = task.Cur_list;
+            if (board.Lists.findIndex(i => i.toString == curList.toString) == -1) {
+                throw errorHandle('Task is not in this board', 404);
+            }
+            await Comment.deleteMany({ Task: { $in: taskId } });
+            await Task.deleteOne({ _id: taskId });
+            return true;
+
+
+        } catch (err) {
+            throw err;
+        }
+    },
     addComment: async function ({ taskId, content }, req) {
         if (req.auth) {
             if (taskId && content) {
@@ -718,9 +744,6 @@ module.exports = {
                         throw errorHandle('Task not found', 404);
                     }
                     const board = await Board.findOne({ Lists: { $in: task.Cur_list } });
-                    if (!board) {
-                        throw errorHandle('Board not found', 404);
-                    }
                     const workspace = await Workspace.findOne({ Boards: { $in: board._id } }, { Admin: 1 });
                     if (!workspace) {
                         throw errorHandle('Workspace not found', 404);
@@ -743,11 +766,46 @@ module.exports = {
                 }
             }
             else {
-                throw errorHandle('Incorrent input data', 400);
+                throw errorHandle('Invalid input data', 400);
             }
             
         } else {
             throw errorHandle('Not authenticated', 400);
         }
+    },
+    getTask: async function ({ boardId,taskId }, req) {
+
+        if (req.auth) {
+            if (!boardId && !taskId) {
+                throw errorHandle('Wrong input data', 400);
+            }
+            if (boardId) {
+                try {
+                    let board = await Board.findById(boardId, { Lists: 1 });
+                    if (!board) {
+                        throw errorHandle('Board not found', 404);
+                    }
+                    let boardLists = board.Lists;
+                    let tasks = await Task.find();
+                    let retTasks = [];
+                    tasks.forEach(j => {
+                        if (boardLists.findIndex(i => i.toString == j._id.toString) != -1) {
+                            retTasks.push(j);
+                        }
+                    })
+                    return retTasks;
+                } catch (err) {
+                    throw err;
+                }
+            }
+            else {
+                const task = await Task.findById(taskId)
+                if (!task) {
+                    throw errorHandle('Task not found', 404);
+                }
+                return [task];
+            }
+        }
+        throw errorHandle('Not authenticated', 400);
     }
 }
