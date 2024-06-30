@@ -20,7 +20,6 @@ const token = async (payload ) => {
 }
 
 const verifyToken = (req, res, next) => {
-
     const authtoken = req.headers["Authorization"] || req.headers["authorization"];
     if (!authtoken) {
         res.StatusCode = 400;
@@ -39,11 +38,28 @@ const verifyToken = (req, res, next) => {
       }
 }
 
+const getPayLoad = function(req){
+    const authtoken = req.Authorization
+    if (!authtoken) {
+        res.StatusCode = 400;
+        throw new Error('Unauthorized: No token provided');
+    }   
+     const SECRET_KEY = process.env.SECRET_KEY
+      try{
+          const curuser = jwt.verify(authtoken,SECRET_KEY);
+          req.current = curuser
+          return req.current.id;
+      } catch (err) {
+          return null
+      }
+     
+}
 
 
 module.exports = {
     registerSchema,
     token,
     loginSchema,
-    verifyToken
+    verifyToken,
+    getPayLoad
 }

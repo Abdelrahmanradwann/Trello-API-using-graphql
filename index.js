@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const express = require('express')
+const path = require('path');
 const app = express();
 const { graphqlHTTP } = require('express-graphql');
 require('dotenv').config();
@@ -10,22 +11,20 @@ const groupResolver = require('./graphql/groupResolver')
 const jwt = require('jsonwebtoken')
 const validate = require('./Middleware/authValidation')
 const User = require('./models/User')
+const Workspace = require('./models/Workspace')
+const { preRequiredInfo } = require('./Middleware/fileUpload')
 const multer = require("multer");
+const io = require('./util/socket')
 
 const url = process.env.URL;
 
-mongoose.connect(url).then(() => {
-    console.log('Connected to DB');
-})
 
 
 
-
-
-app.use("/api/uploads/image", validate.verifyToken,(req, res, next) => {
+app.use("/api/uploads/profilePicture", validate.verifyToken,(req, res, next) => {
   res.setHeader("Content-Type", "image/jpeg") 
   next()
-}, express.static("uploads/image"));
+}, express.static("uploads/profilePicture"));
 
 app.use("/api/uploads/voice",  validate.verifyToken, (req, res, next) => {
   res.setHeader("Content-Type", "audio/mp3");
@@ -36,13 +35,13 @@ app.use("/api/uploads/voice",  validate.verifyToken, (req, res, next) => {
 
 
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
+    destination: (req, file, cb) => {
     let destinationFolder = '';
     const fileType = file.mimetype.split('/')[0];
     if (fileType === 'image') {
-      destinationFolder = 'uploads/image';
+      destinationFolder = path.join('uploads','image')
     } else if (fileType === 'audio') {
-      destinationFolder = 'uploads/voice';
+      destinationFolder = path.join('uploads','voice')
     } else {
       return cb(new Error('Unsupported file type'), null);
     }
@@ -50,18 +49,36 @@ const storage = multer.diskStorage({
     },
     
 
-   filename: async(req, file, cb) => {
-    const ext = file.mimetype.split('/')[1];
-    let filename = file.mimetype.split('/')[0];
-    const curData = new Date().getTime();
-       if (filename == "image") {
-        filename = `${req.current.id}.${curData}.${ext}`;
-        const user = await User.findById(req.current.id);
-        user.Profile_Pic = filename;
-        await user.save();
-    }
-     else {
-       filename = `${req.current.id}.${curData}.${ext}`; 
+    filename: async (req, file, cb) => {
+
+       const ext = file.mimetype.split('/')[1];
+       let filename = file.mimetype.split('/')[0];
+       const curData = new Date().getTime();
+       if (filename == "image" && req.current.id) {
+           if (req.body.dest == 'profile') {
+               filename = `${req.current.id}.${ext}`;
+               const user = await User.findById(req.current.id);
+               user.Profile_Pic = filename;
+               await user.save();
+           }
+           else if (req.body.dest == 'workspace' && req.body.workspaceId && await Workspace.findById(req.body.workspaceId), { $in: { Users: req.current.id } }) {
+               filename = `${req.workspaceId}.${req.current.id}.${curData}.${ext}`;
+           }
+           else {
+               return cb('Not authorized');
+           }
+    } 
+    else if (filename == 'audio') {
+        const ws = await Workspace.findOne({ _id: req.body.workspaceId })
+        if (!ws || ws.Users.findIndex(i => i._id.toString() == req.current.id.toString()) == -1) {
+              return cb('Unauthorized');
+        }
+        else {
+            filename = `${req.body.workspaceId}.${req.current.id}.${curData}.${ext}`; 
+        }
+    
+    } else {
+        return cb(new Error('Invalid file name'))
     }
     cb(null, filename); 
     },
@@ -85,7 +102,7 @@ const upload = multer({
 
 
 
-app.post('/api/file', validate.verifyToken , upload.single('avatar'), (req, res) => {
+app.post('/api/file', validate.verifyToken ,upload.single('avatar'), preRequiredInfo ,(req, res) => {
     return res.status(200).send('File uploaded successfully')
 })
 
@@ -145,6 +162,13 @@ app.use('/graphql/admin', graphqlHTTP({
 
 
 
-app.listen(process.env.PORT, () => {
-    console.log("Conntected to port")
+mongoose.connect(url).then(() => {
+    console.log('Connected to DB');
+    let server = app.listen(process.env.PORT);
+    io.init(server);
+    io.getIO().on('connection', io.onConnection);
 })
+
+// app.listen(process.env.PORT, () => {
+//     console.log("Conntected to port")
+// })

@@ -10,6 +10,7 @@ const User = require('../models/User')
 const { sendEmail } = require('../Middleware/sendMail');
 const { v4: uuid4 } = require('uuid');
 const { restart } = require('nodemon');
+const {getIO} = require('../util/socket')
 
 module.exports = {
     addUser: async function ({ userId, workSpaceId }, req) {
@@ -120,11 +121,11 @@ module.exports = {
     },
     createBoard: async function ({ inputData , workspaceId }, req) {
         const Title = inputData.Title;
-        const Creator = inputData.Creator;
-        // if (!req.auth) {
-        //     const error = errorHandle('Not authenticated', 400);
-        //     throw error;
-        // }
+        const Creator = inputData.Creator; 
+        if (!req.auth) {
+            const error = errorHandle('Not authenticated', 400);
+            throw error;
+        }
         try {
             const workspace = await Workspace.findOne({ _id: workspaceId, Admin: { $in: req.current.id } });
             if (!workspace) {
@@ -142,7 +143,15 @@ module.exports = {
             board = await board.save();
             workspace.Boards.push(board._id);
             await workspace.save();
-            let res = {msg:'Board created successfully',board:board,status:true}
+            let res = { msg: 'Board created successfully', board: board, status: true }
+            let sockets = getIO();
+            const members = workspace.Users;
+            members.forEach(i => {
+                console.log(i+ " "+sockets.userSocket[i.toString()])
+                if (sockets && sockets.userSocket[i.toString()] && i.toString() != req.current.id.toString()) {
+                    sockets.to(sockets.userSocket[i.toString()]).emit('createBoard', { baordId: board._id, board: board });
+                }
+            })
             return res;
         } catch (err) {
             throw err;
@@ -322,14 +331,12 @@ module.exports = {
                         if (workspace.Boards.includes(inputList.boardId)) {
                             const lists = await Board.findById(inputList.boardId).select('Lists')
                                 .populate('Lists', 'Title Transition AllowedRoles');
-                            // console.log(lists)
                             lists.Lists.forEach(i => {
                                 if (i.Title == inputList.Title) {
                                     throw errorHandle('Please select another Title for list', 400)
                                 }
                             })
                             let board = await Board.findById(inputList.boardId)
-                            // console.log(inputList.transition)
                             if (inputList.transition) {
                                 inputList.transition.forEach(i => {
                                     if (!board.Lists.includes(i)) {
@@ -354,6 +361,15 @@ module.exports = {
                             res.board = board;
                             res.msg = 'List added to board successfully'
                             res.status = true
+                            let sockets = getIO();
+                            const members = board.Users;
+                            members.forEach(i => {
+                                i = i.userId;
+                                // console.log(i+ ' '+sockets.userSocket[i.toString()])
+                                if (sockets && sockets.userSocket[i.toString()] && i.toString() != req.current.id.toString()) {
+                                sockets.to(sockets.userSocket[i.toString()]).emit('addList', { baordId: board._id, board: board });
+                            }
+                         })
                             return res
                         }
                         const error = errorHandle('No Board found', 404);
@@ -400,6 +416,15 @@ module.exports = {
                                 { _id: board._id },
                                 { $pull: { Lists: { _id: listId } } }
                             );
+                            let sockets = getIO();
+                            const members = board.Users;
+                            members.forEach(i => {
+                                i = i.userId;
+                                // console.log(i+ ' '+sockets.userSocket[i.toString()])
+                                if (sockets && sockets.userSocket[i.toString()] && i.toString() != req.current.id.toString()) {
+                                sockets.to(sockets.userSocket[i.toString()]).emit('removeList', { baordId: board._id, board: board });
+                            }
+                         })
                             return true;
                         }
                         throw errorHandle('List does not found', 404);
@@ -428,7 +453,7 @@ module.exports = {
                     if (indx != -1) {
                         indx = workspace.Boards.findIndex(i => i._id == inputList.boardId);
                         if (indx != -1) {
-                            const board = await Board.findOne({ _id: workspace.Boards[indx] }, { Lists: true });
+                            const board = await Board.findOne({ _id: workspace.Boards[indx] }, { Lists: true, Users: true });
                             if (board.Lists.includes(lstId)) {
                                 let list = await List.findById(lstId);
                                 list.Title = inputList.Title || list.Title;
@@ -439,6 +464,15 @@ module.exports = {
                                 res.msg = 'List updated successfully';
                                 res.lst = list
                                 res.status = true
+                                let sockets = getIO();
+                                const members = board.Users;
+                                members.forEach(i => {
+                                    i = i.userId;
+                                // console.log(i+ ' '+sockets.userSocket[i.toString()])
+                                    if (sockets && sockets.userSocket[i.toString()] && i.toString() != req.current.id.toString()) {
+                                    sockets.to(sockets.userSocket[i.toString()]).emit('modifyList', { baordId: board._id, board: board });
+                            }
+                         })
                                 return res
                             }
                             else {
@@ -485,7 +519,16 @@ module.exports = {
                     board.Title = inputBoard.Title || board.Title;
                     board.LinkExpiryDate = inputBoard.LinkExpiryDate || board.LinkExpiryDate;
                     await board.save();
-                    let res = {msg:'Board modified successfully',board:board,status:true}
+                    let res = { msg: 'Board modified successfully', board: board, status: true }
+                    let sockets = getIO();
+                    const members = board.Users;
+                    members.forEach(i => {
+                        i = i.userId;
+                        // console.log(i+ ' '+sockets.userSocket[i.toString()])
+                        if (sockets && sockets.userSocket[i.toString()] && i.toString() != req.current.id.toString()) {
+                        sockets.to(sockets.userSocket[i.toString()]).emit('modifyBoard', { baordId: board._id, board: board });
+                        }
+                    })
                     return res
                 }
                 else {
@@ -507,7 +550,7 @@ module.exports = {
                 throw errorHandle('Invalid input data', 400);
             }
             try {
-                const workspace = await Workspace.findOne({ _id: workSpaceId, Boards: { $in: boardId } }, { Admin: 1 });
+                const workspace = await Workspace.findOne({ _id: workSpaceId, Boards: { $in: boardId } }, { Admin: 1, Users: 1 });
                 if (!workspace) {
                     throw errorHandle('Workspace not found', 404);
                 }
@@ -523,7 +566,13 @@ module.exports = {
                 await List.deleteMany({ _id: { $in: board } });
                 await Workspace.updateOne({ _id: workSpaceId }, { $pull: { Boards: boardId } });
                 await Board.deleteOne({ _id: boardId });
-    
+                let sockets = getIO();
+                const members = workspace.Users;
+                members.forEach(i => {
+                    if (sockets && sockets.userSocket[i.toString()] && i.toString() != req.current.id.toString()) {
+                        sockets.to(sockets.userSocket[i.toString()]).emit('deleteBoard', { baordId: board._id, board: board });
+                }
+            })
                 return true;
 
             } catch (err) {
@@ -603,6 +652,14 @@ module.exports = {
                         res.task.Deadline = toString(taskData.Deadline)
                         res.msg = 'Task added successfully'
                         res.status = true
+                        let sockets = getIO();
+                        const members = board.Users;
+                        members.forEach(i => {
+                            i = i.userId;
+                            if (sockets && sockets.userSocket[i.toString()] && i.toString() != req.current.id.toString()) {
+                                sockets.to(sockets.userSocket[i.toString()]).emit('addTask', { baordId: board._id, board: board });
+                        }
+                    })
                         return res
                     }
                     else {
@@ -665,6 +722,14 @@ module.exports = {
                     task: task,
                     status: true
                 };
+                let sockets = getIO();
+                const members = board.Users;
+                members.forEach(i => {
+                    i = i.userId;
+                    if (sockets && sockets.userSocket[i.toString()] && i.toString() != req.current.id.toString()) {
+                    sockets.to(sockets.userSocket[i.toString()]).emit('modifyTask', { baordId: board._id, board: board });
+                    }
+                })
                 return res;
             } catch (err) {
                 throw err;
@@ -695,6 +760,14 @@ module.exports = {
                     task: task,
                     status: true
                 }
+                let sockets = getIO();
+                const members = board.Users;
+                members.forEach(i => {
+                    i = i.userId;
+                    if (sockets && sockets.userSocket[i.toString()] && i.toString() != req.current.id.toString()) {
+                    sockets.to(sockets.userSocket[i.toString()]).emit('modifyBoard', { baordId: board._id, board: board });
+                    }
+                })
                 return res;
             } catch (err) {
                 throw err;
@@ -728,6 +801,14 @@ module.exports = {
             }
             await Comment.deleteMany({ Task: { $in: taskId } });
             await Task.deleteOne({ _id: taskId });
+            let sockets = getIO();
+            const members = board.Users;
+            members.forEach(i => {
+                    i = i.userId;
+                    if (sockets && sockets.userSocket[i.toString()] && i.toString() != req.current.id.toString()) {
+                    sockets.to(sockets.userSocket[i.toString()]).emit('deleteTask', { baordId: board._id, board: board });
+                    }
+                })
             return true;
 
 
@@ -754,7 +835,14 @@ module.exports = {
                             Sender: req.current.id,
                             Content: content
                         })
-                        await comment.save();
+                    await comment.save();
+                    let sockets = getIO();
+                    const members = task.AssignedUsers;
+                    members.forEach(i => {
+                        if (sockets && sockets.userSocket[i.toString()] && i.toString() != req.current.id.toString()) {
+                           sockets.to(sockets.userSocket[i.toString()]).emit('modifyBoard', { baordId: board._id, board: board });
+                        }
+                    })
                         let res = { msg: 'Comment added successfully', task: task, status: 1 };
                         return res;
                     }
@@ -774,7 +862,6 @@ module.exports = {
         }
     },
     getTask: async function ({ boardId,taskId }, req) {
-
         if (req.auth) {
             if (!boardId && !taskId) {
                 throw errorHandle('Wrong input data', 400);
